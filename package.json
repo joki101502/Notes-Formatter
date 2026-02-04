@@ -1,0 +1,23 @@
+{
+  "name": "notes-formatter",
+  "version": "1.0.0",
+  "description": "A simple webapp to upload and format notes using Scout API",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "scoutos": "^0.11.2"
+  },
+  "keywords": [
+    "notes",
+    "formatter",
+    "scout"
+  ],
+  "author": "",
+  "license": "MIT"
+}
