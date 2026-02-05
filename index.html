@@ -3,39 +3,47 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Notes Formatter</title>
+    <title>MissionML Notes Formatter</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="container">
         <header>
-            <h1>📝 Notes Formatter</h1>
+            <h1>MissionML Notes Formatter</h1>
             <p>Paste your notes and format them with AI</p>
         </header>
 
         <main>
             <div class="input-section">
                 <label for="notesInput" class="input-label">Paste your notes here:</label>
-                <textarea 
-                    id="notesInput" 
-                    class="notes-input" 
-                    placeholder="Copy and paste your notes here (supports bullet points and indentation)..."
-                    rows="15"
-                    spellcheck="false"
-                ></textarea>
+                <div class="textarea-wrapper">
+                    <textarea 
+                        id="notesInput" 
+                        class="notes-input" 
+                        placeholder="Copy and paste your notes here (supports bullet points and indentation)..."
+                        rows="15"
+                        spellcheck="false"
+                    ></textarea>
+                    <!-- Loading Overlay -->
+                    <div class="loading-overlay" id="loadingOverlay" style="display: none;">
+                        <div class="loading-content">
+                            <div class="spinner"></div>
+                            <div class="loading-message" id="loadingMessage">Reading Notes...</div>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <div class="actions">
                 <button id="formatBtn" class="format-btn">
                     <span class="btn-text">Format Notes</span>
-                    <span class="btn-loader" style="display: none;">⏳ Formatting...</span>
+                    <span class="btn-loader" style="display: none;">Formatting...</span>
                 </button>
             </div>
 
             <div class="result-section" id="resultSection" style="display: none;">
-                <h2>Formatted Notes</h2>
                 <div class="result-content" id="resultContent"></div>
-                <button class="copy-btn" id="copyBtn">Copy to Clipboard</button>
+                <button class="copy-btn" id="copyBtn" style="display: none;">Copy to Clipboard</button>
             </div>
 
             <div class="error-message" id="errorMessage" style="display: none;"></div>

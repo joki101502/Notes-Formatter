@@ -59,13 +59,74 @@ app.post('/api/format', async (req, res) => {
         }
         
         let formattedNotes = '';
+        let isJSON = false;
         
         if (state?.llm?.output) {
-            formattedNotes = state.llm.output;
+            let output = state.llm.output;
+            
+            // Strip markdown code blocks if present (handle various formats)
+            if (typeof output === 'string') {
+                // Remove ```json and ``` markers (handle multiline and same-line cases)
+                // Handle: ```json { ... } ```
+                output = output
+                    .replace(/^```json\s*\{/i, '{')  // ```json { at start
+                    .replace(/\}\s*```$/g, '}')      // } ``` at end
+                    .replace(/^```json\s*\n?/i, '')  // ```json\n at start
+                    .replace(/^```\s*\n?/i, '')      // ```\n at start
+                    .replace(/\n?\s*```$/g, '')      // ``` at end
+                    .replace(/^```json\s*/i, '')     // ```json at start (no newline)
+                    .replace(/\s*```$/g, '')         // ``` at end (no newline)
+                    .trim();
+            }
+            
+            // Check if output is a JSON string that needs parsing
+            if (typeof output === 'string') {
+                // Try to parse as JSON
+                try {
+                    const parsed = JSON.parse(output);
+                    // If it has the meeting synthesis structure, return as object
+                    if (parsed.bluf && parsed.meeting_recap) {
+                        console.log('Detected meeting synthesis structure');
+                        return res.json({ 
+                            formatted_notes: JSON.stringify(parsed, null, 2),
+                            is_structured: true
+                        });
+                    }
+                    // Otherwise, return the parsed JSON as string
+                    formattedNotes = JSON.stringify(parsed, null, 2);
+                    isJSON = true;
+                } catch (e) {
+                    console.log('Failed to parse as JSON, using as plain text. Error:', e.message);
+                    // Not JSON, use as-is
+                    formattedNotes = output;
+                }
+            } else if (typeof output === 'object') {
+                // Already an object, check if it's meeting synthesis
+                if (output.bluf && output.meeting_recap) {
+                    console.log('Detected meeting synthesis structure (object)');
+                    return res.json({ 
+                        formatted_notes: JSON.stringify(output, null, 2),
+                        is_structured: true
+                    });
+                }
+                formattedNotes = JSON.stringify(output, null, 2);
+                isJSON = true;
+            } else {
+                formattedNotes = String(output);
+            }
         } else if (state?.json_output?.output) {
-            formattedNotes = typeof state.json_output.output === 'string' 
-                ? state.json_output.output 
-                : JSON.stringify(state.json_output.output, null, 2);
+            const output = state.json_output.output;
+            if (typeof output === 'object') {
+                if (output.bluf && output.meeting_recap) {
+                    return res.json({ 
+                        formatted_notes: JSON.stringify(output, null, 2),
+                        is_structured: true
+                    });
+                }
+                formattedNotes = JSON.stringify(output, null, 2);
+            } else {
+                formattedNotes = output;
+            }
         } else {
             // Log available state keys for debugging if extraction fails
             const stateKeys = Object.keys(state).filter(key => !key.startsWith('__') && key !== 'inputs');
@@ -76,7 +137,8 @@ app.post('/api/format', async (req, res) => {
 
         // Return the formatted notes (matching the frontend expectation)
         res.json({ 
-            formatted_notes: formattedNotes
+            formatted_notes: formattedNotes,
+            is_structured: isJSON
         });
     } catch (error) {
         console.error('Error formatting notes:', error);
