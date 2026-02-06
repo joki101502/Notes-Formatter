@@ -7,18 +7,25 @@ const notesInput = document.getElementById('notesInput');
 const formatBtn = document.getElementById('formatBtn');
 const resultSection = document.getElementById('resultSection');
 const resultContent = document.getElementById('resultContent');
-const copyBtn = document.getElementById('copyBtn');
 const errorMessage = document.getElementById('errorMessage');
 const loadingOverlay = document.getElementById('loadingOverlay');
 const loadingMessage = document.getElementById('loadingMessage');
 const recordBtn = document.getElementById('recordBtn');
+const recordTabBtn = document.getElementById('recordTabBtn');
+const recordBothBtn = document.getElementById('recordBothBtn');
 
 // Speech-to-text state
 let isRecording = false;
+let isRecordingTab = false;
+let isRecordingBoth = false;
 let mediaRecorder = null;
 let audioStream = null;
 let selectedFormat = null;
 let segmentChunks = [];
+let recordingMode = 'mic'; // 'mic', 'tab', or 'both'
+let audioContext = null;
+let micStream = null;
+let tabStream = null;
 
 // Support for bullet points and indentation in textarea
 notesInput.addEventListener('keydown', (e) => {
@@ -44,7 +51,6 @@ notesInput.addEventListener('keydown', (e) => {
         } else {
             // Tab: Indent
             const linesBefore = value.substring(0, start).split('\n');
-            const linesAfter = value.substring(end).split('\n');
             const currentLineIndex = linesBefore.length - 1;
             
             // If there's a selection spanning multiple lines, indent all selected lines
@@ -348,11 +354,175 @@ function addTranscription(transcript) {
     notesInput.dispatchEvent(new Event('input'));
 }
 
-// Start recording
+// Start recording from microphone
 async function startRecording() {
     try {
         // Request microphone access
         audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        recordingMode = 'mic';
+        await setupRecording();
+    } catch (error) {
+        console.error('Error starting microphone recording:', error);
+        showError(`Failed to start microphone recording: ${error.message}`);
+        isRecording = false;
+        recordBtn.classList.remove('recording');
+    }
+}
+
+// Combine two audio streams into one
+async function combineAudioStreams(micStream, tabStream) {
+    try {
+        // Create audio context
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        
+        // Create source nodes from both streams
+        const micSource = audioContext.createMediaStreamSource(micStream);
+        const tabSource = audioContext.createMediaStreamSource(tabStream);
+        
+        // Create a destination node to mix both streams
+        const destination = audioContext.createMediaStreamDestination();
+        
+        // Connect both sources to the destination (mixing)
+        micSource.connect(destination);
+        tabSource.connect(destination);
+        
+        // Return the mixed stream
+        return destination.stream;
+    } catch (error) {
+        console.error('Error combining audio streams:', error);
+        throw error;
+    }
+}
+
+// Start recording from both microphone and tab audio
+async function startBothRecording() {
+    try {
+        // Request both microphone and tab audio
+        const [mic, tab] = await Promise.all([
+            navigator.mediaDevices.getUserMedia({ audio: true }),
+            navigator.mediaDevices.getDisplayMedia({ 
+                video: true, 
+                audio: {
+                    echoCancellation: false,
+                    noiseSuppression: false,
+                    autoGainControl: false,
+                    suppressLocalAudioPlayback: false
+                }
+            })
+        ]);
+        
+        // Check if tab audio track exists
+        const tabAudioTracks = tab.getAudioTracks();
+        if (tabAudioTracks.length === 0) {
+            // User didn't share audio
+            mic.getTracks().forEach(track => track.stop());
+            tab.getTracks().forEach(track => track.stop());
+            showError('No audio track detected in tab. Please make sure to check "Share tab audio" when selecting a tab.');
+            isRecordingBoth = false;
+            recordBothBtn.classList.remove('recording');
+            return;
+        }
+        
+        // Stop video track if present (we only need audio)
+        const videoTracks = tab.getVideoTracks();
+        videoTracks.forEach(track => track.stop());
+        
+        // Store individual streams for cleanup
+        micStream = mic;
+        tabStream = tab;
+        
+        // Combine the two audio streams
+        audioStream = await combineAudioStreams(mic, tab);
+        
+        recordingMode = 'both';
+        await setupRecording();
+        
+        // Handle user stopping sharing from browser UI
+        tabAudioTracks[0].addEventListener('ended', () => {
+            if (isRecordingBoth) {
+                stopBothRecording();
+            }
+        });
+        
+    } catch (error) {
+        console.error('Error starting both recording:', error);
+        if (error.name === 'NotAllowedError') {
+            showError('Permission denied. Please allow microphone and tab sharing to record audio.');
+        } else {
+            showError(`Failed to start recording: ${error.message}`);
+        }
+        isRecordingBoth = false;
+        recordBothBtn.classList.remove('recording');
+        // Clean up streams if they were created
+        if (micStream) {
+            micStream.getTracks().forEach(track => track.stop());
+            micStream = null;
+        }
+        if (tabStream) {
+            tabStream.getTracks().forEach(track => track.stop());
+            tabStream = null;
+        }
+        if (audioContext) {
+            audioContext.close();
+            audioContext = null;
+        }
+    }
+}
+
+// Start recording from tab audio
+async function startTabRecording() {
+    try {
+        // Request tab audio capture
+        audioStream = await navigator.mediaDevices.getDisplayMedia({ 
+            video: true, 
+            audio: {
+                echoCancellation: false,
+                noiseSuppression: false,
+                autoGainControl: false,
+                suppressLocalAudioPlayback: false
+            }
+        });
+        
+        // Check if audio track exists
+        const audioTracks = audioStream.getAudioTracks();
+        if (audioTracks.length === 0) {
+            // User didn't share audio
+            audioStream.getTracks().forEach(track => track.stop());
+            showError('No audio track detected. Please make sure to check "Share tab audio" when selecting a tab.');
+            isRecordingTab = false;
+            recordTabBtn.classList.remove('recording');
+            return;
+        }
+        
+        // Stop video track if present (we only need audio)
+        const videoTracks = audioStream.getVideoTracks();
+        videoTracks.forEach(track => track.stop());
+        
+        recordingMode = 'tab';
+        await setupRecording();
+        
+        // Handle user stopping sharing from browser UI
+        audioTracks[0].addEventListener('ended', () => {
+            if (isRecordingTab) {
+                stopTabRecording();
+            }
+        });
+        
+    } catch (error) {
+        console.error('Error starting tab recording:', error);
+        if (error.name === 'NotAllowedError') {
+            showError('Permission denied. Please allow tab sharing to record audio.');
+        } else {
+            showError(`Failed to start tab recording: ${error.message}`);
+        }
+        isRecordingTab = false;
+        recordTabBtn.classList.remove('recording');
+    }
+}
+
+// Setup recording (shared logic for both mic and tab)
+async function setupRecording() {
+    try {
         
         // Select best audio format
         selectedFormat = selectBestAudioFormat();
@@ -400,9 +570,15 @@ async function startRecording() {
                 segmentChunks = []; // Clear for next segment
                 
                 // Restart if still recording (reduced delay for live transcription)
-                if (isRecording && mediaRecorder && mediaRecorder.state === 'inactive') {
+                const stillRecording = (recordingMode === 'mic' && isRecording) || 
+                                     (recordingMode === 'tab' && isRecordingTab) ||
+                                     (recordingMode === 'both' && isRecordingBoth);
+                if (stillRecording && mediaRecorder && mediaRecorder.state === 'inactive') {
                     setTimeout(() => {
-                        if (isRecording && mediaRecorder) {
+                        const stillRecordingCheck = (recordingMode === 'mic' && isRecording) || 
+                                                   (recordingMode === 'tab' && isRecordingTab) ||
+                                                   (recordingMode === 'both' && isRecordingBoth);
+                        if (stillRecordingCheck && mediaRecorder) {
                             mediaRecorder.start();
                             // Stop after 2 seconds for live transcription
                             setTimeout(() => {
@@ -424,18 +600,50 @@ async function startRecording() {
             }
         }, 2000); // Reduced to 2 seconds for live transcription
         
-        isRecording = true;
-        recordBtn.classList.add('recording');
+        if (recordingMode === 'mic') {
+            isRecording = true;
+            recordBtn.classList.add('recording');
+        } else if (recordingMode === 'tab') {
+            isRecordingTab = true;
+            recordTabBtn.classList.add('recording');
+        } else if (recordingMode === 'both') {
+            isRecordingBoth = true;
+            recordBothBtn.classList.add('recording');
+        }
         
     } catch (error) {
-        console.error('Error starting recording:', error);
-        showError(`Failed to start recording: ${error.message}`);
-        isRecording = false;
-        recordBtn.classList.remove('recording');
+        console.error('Error setting up recording:', error);
+        showError(`Failed to setup recording: ${error.message}`);
+        if (recordingMode === 'mic') {
+            isRecording = false;
+            recordBtn.classList.remove('recording');
+        } else if (recordingMode === 'tab') {
+            isRecordingTab = false;
+            recordTabBtn.classList.remove('recording');
+        } else if (recordingMode === 'both') {
+            isRecordingBoth = false;
+            recordBothBtn.classList.remove('recording');
+        }
+        if (audioStream) {
+            audioStream.getTracks().forEach(track => track.stop());
+            audioStream = null;
+        }
+        if (micStream) {
+            micStream.getTracks().forEach(track => track.stop());
+            micStream = null;
+        }
+        if (tabStream) {
+            tabStream.getTracks().forEach(track => track.stop());
+            tabStream = null;
+        }
+        if (audioContext) {
+            audioContext.close();
+            audioContext = null;
+        }
     }
 }
 
-// Stop recording
+// Stop microphone recording
 function stopRecording() {
     isRecording = false;
     recordBtn.classList.remove('recording');
@@ -453,12 +661,102 @@ function stopRecording() {
     segmentChunks = [];
 }
 
-// Record button handler
+// Stop tab recording
+function stopTabRecording() {
+    isRecordingTab = false;
+    recordTabBtn.classList.remove('recording');
+    
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        mediaRecorder.stop();
+    }
+    
+    if (audioStream) {
+        audioStream.getTracks().forEach(track => track.stop());
+        audioStream = null;
+    }
+    
+    mediaRecorder = null;
+    segmentChunks = [];
+}
+
+// Stop both recording
+function stopBothRecording() {
+    isRecordingBoth = false;
+    recordBothBtn.classList.remove('recording');
+    
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        mediaRecorder.stop();
+    }
+    
+    // Stop all streams
+    if (micStream) {
+        micStream.getTracks().forEach(track => track.stop());
+        micStream = null;
+    }
+    
+    if (tabStream) {
+        tabStream.getTracks().forEach(track => track.stop());
+        tabStream = null;
+    }
+    
+    if (audioStream) {
+        audioStream.getTracks().forEach(track => track.stop());
+        audioStream = null;
+    }
+    
+    // Close audio context
+    if (audioContext) {
+        audioContext.close();
+        audioContext = null;
+    }
+    
+    mediaRecorder = null;
+    segmentChunks = [];
+}
+
+// Record button handlers
 recordBtn.addEventListener('click', () => {
+    // Stop tab recording if active
+    if (isRecordingTab) {
+        stopTabRecording();
+    }
+    
     if (isRecording) {
         stopRecording();
     } else {
         startRecording();
+    }
+});
+
+recordTabBtn.addEventListener('click', () => {
+    // Stop other recordings if active
+    if (isRecording) {
+        stopRecording();
+    }
+    if (isRecordingBoth) {
+        stopBothRecording();
+    }
+    
+    if (isRecordingTab) {
+        stopTabRecording();
+    } else {
+        startTabRecording();
+    }
+});
+
+recordBothBtn.addEventListener('click', () => {
+    // Stop other recordings if active
+    if (isRecording) {
+        stopRecording();
+    }
+    if (isRecordingTab) {
+        stopTabRecording();
+    }
+    
+    if (isRecordingBoth) {
+        stopBothRecording();
+    } else {
+        startBothRecording();
     }
 });
 
@@ -537,18 +835,6 @@ formatBtn.addEventListener('click', async () => {
 });
 
 // Copy button handler (for plain text)
-copyBtn.addEventListener('click', () => {
-    const text = resultContent.textContent;
-    navigator.clipboard.writeText(text).then(() => {
-        const originalText = copyBtn.textContent;
-        copyBtn.textContent = 'Copied!';
-        setTimeout(() => {
-            copyBtn.textContent = originalText;
-        }, 2000);
-    });
-});
-
-
 // Display formatted result
 function displayResult(formattedText, isStructured = false) {
     // Clean up the text - remove markdown code blocks if present
@@ -573,7 +859,6 @@ function displayResult(formattedText, isStructured = false) {
         if (data.bluf && data.meeting_recap) {
             // Render structured meeting synthesis
             renderMeetingSynthesis(data);
-            copyBtn.style.display = 'none'; // Hide plain text copy button, synthesis has its own
             resultSection.style.display = 'block';
             resultSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
             return;
@@ -603,7 +888,6 @@ function displayResult(formattedText, isStructured = false) {
     // Store plain text globally for copy function
     window.formattedPlainText = cleanText;
     
-    copyBtn.style.display = 'none'; // Hide old plain text copy button
     resultSection.style.display = 'block';
     resultSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }

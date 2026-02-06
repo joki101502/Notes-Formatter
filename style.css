@@ -64,6 +64,12 @@ main {
     margin-bottom: 8px;
 }
 
+.record-buttons {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
 .input-label {
     display: block;
     font-size: 0.875em;
@@ -101,6 +107,74 @@ main {
     background: #dc2626;
     animation: pulse 1s ease-in-out infinite;
     box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.7);
+}
+
+.record-btn-tab {
+    background: #2563eb;
+    box-shadow: 0 2px 4px rgba(37, 99, 235, 0.3);
+}
+
+.record-btn-both {
+    background: #9333ea;
+    box-shadow: 0 2px 4px rgba(147, 51, 234, 0.3);
+}
+
+.record-btn-tab:hover {
+    background: #1d4ed8;
+    box-shadow: 0 3px 6px rgba(37, 99, 235, 0.4);
+}
+
+.record-btn-tab.recording {
+    background: #2563eb;
+    animation: pulseBlue 1s ease-in-out infinite;
+    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7);
+}
+
+.record-btn-both:hover {
+    background: #7e22ce;
+    box-shadow: 0 3px 6px rgba(147, 51, 234, 0.4);
+}
+
+.record-btn-both.recording {
+    background: #9333ea;
+    animation: pulsePurple 1s ease-in-out infinite;
+    box-shadow: 0 0 0 0 rgba(168, 85, 247, 0.7);
+}
+
+@keyframes pulseBlue {
+    0% {
+        box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7),
+                    0 2px 4px rgba(59, 130, 246, 0.3);
+        transform: scale(1);
+    }
+    50% {
+        box-shadow: 0 0 0 10px rgba(59, 130, 246, 0),
+                    0 2px 12px rgba(59, 130, 246, 0.6);
+        transform: scale(1.05);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(59, 130, 246, 0),
+                    0 2px 4px rgba(59, 130, 246, 0.3);
+        transform: scale(1);
+    }
+}
+
+@keyframes pulsePurple {
+    0% {
+        box-shadow: 0 0 0 0 rgba(168, 85, 247, 0.7),
+                    0 2px 4px rgba(168, 85, 247, 0.3);
+        transform: scale(1);
+    }
+    50% {
+        box-shadow: 0 0 0 10px rgba(168, 85, 247, 0),
+                    0 2px 12px rgba(168, 85, 247, 0.6);
+        transform: scale(1.05);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(168, 85, 247, 0),
+                    0 2px 4px rgba(168, 85, 247, 0.3);
+        transform: scale(1);
+    }
 }
 
 .record-icon {
@@ -365,25 +439,6 @@ main {
 .text-muted {
     color: #999;
     font-style: italic;
-}
-
-.copy-btn {
-    margin-top: 16px;
-    background: white;
-    color: #01a95f;
-    border: 1px solid #01a95f;
-    padding: 8px 16px;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 0.8125em;
-    font-weight: 500;
-    transition: all 0.2s ease;
-}
-
-.copy-btn:hover {
-    background: #01a95f;
-    color: white;
-    border-color: #01a95f;
 }
 
 .error-message {
