@@ -57,14 +57,80 @@ main {
     position: relative;
 }
 
+.input-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
 .input-label {
     display: block;
     font-size: 0.875em;
     font-weight: 500;
     color: #374151;
-    margin-bottom: 8px;
     text-transform: uppercase;
     letter-spacing: 0.05em;
+}
+
+.record-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: none;
+    background: #dc2626;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 4px rgba(220, 38, 38, 0.3);
+}
+
+.record-btn:hover {
+    background: #b91c1c;
+    transform: scale(1.05);
+    box-shadow: 0 3px 6px rgba(220, 38, 38, 0.4);
+}
+
+.record-btn:active {
+    transform: scale(0.95);
+}
+
+.record-btn.recording {
+    background: #dc2626;
+    animation: pulse 1s ease-in-out infinite;
+    box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.7);
+}
+
+.record-icon {
+    width: 16px;
+    height: 16px;
+    transition: all 0.2s ease;
+    display: block;
+}
+
+.record-btn.recording .record-icon {
+    opacity: 0.9;
+    transform: scale(1.1);
+}
+
+@keyframes pulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.7),
+                    0 2px 4px rgba(220, 38, 38, 0.3);
+        transform: scale(1);
+    }
+    50% {
+        box-shadow: 0 0 0 10px rgba(220, 38, 38, 0),
+                    0 2px 12px rgba(220, 38, 38, 0.6);
+        transform: scale(1.05);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(220, 38, 38, 0),
+                    0 2px 4px rgba(220, 38, 38, 0.3);
+        transform: scale(1);
+    }
 }
 
 .notes-input {

@@ -1,3 +1,7 @@
+// Deepgram API Configuration
+const DEEPGRAM_API_KEY = '102d06d33365001135022be079b39cda7eb79450';
+const DEEPGRAM_API_URL = 'https://api.deepgram.com/v1/listen';
+
 // DOM elements
 const notesInput = document.getElementById('notesInput');
 const formatBtn = document.getElementById('formatBtn');
@@ -7,6 +11,14 @@ const copyBtn = document.getElementById('copyBtn');
 const errorMessage = document.getElementById('errorMessage');
 const loadingOverlay = document.getElementById('loadingOverlay');
 const loadingMessage = document.getElementById('loadingMessage');
+const recordBtn = document.getElementById('recordBtn');
+
+// Speech-to-text state
+let isRecording = false;
+let mediaRecorder = null;
+let audioStream = null;
+let selectedFormat = null;
+let segmentChunks = [];
 
 // Support for bullet points and indentation in textarea
 notesInput.addEventListener('keydown', (e) => {
@@ -243,6 +255,211 @@ notesInput.addEventListener('paste', (e) => {
     
     // Trigger input event for any listeners
     notesInput.dispatchEvent(new Event('input'));
+});
+
+// Audio format selection
+function selectBestAudioFormat() {
+    const formatOptions = [
+        'audio/webm;codecs=opus',
+        'audio/webm',
+        'audio/ogg;codecs=opus',
+        'audio/mp4',
+        'audio/wav'
+    ];
+    
+    for (const format of formatOptions) {
+        if (MediaRecorder.isTypeSupported(format)) {
+            return format;
+        }
+    }
+    
+    return null; // Fallback to browser default
+}
+
+// Transcribe audio with Deepgram
+async function transcribeWithDeepgram(audioBlob) {
+    // Check blob size - too small might be invalid
+    if (audioBlob.size < 100) {
+        console.log('Skipping too small audio chunk:', audioBlob.size, 'bytes');
+        return null;
+    }
+    
+    try {
+        const response = await fetch(
+            `${DEEPGRAM_API_URL}?model=nova-2&language=en-US&punctuate=true`,
+            {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Token ${DEEPGRAM_API_KEY}`
+                    // DO NOT set Content-Type - let Deepgram auto-detect
+                },
+                body: audioBlob
+            }
+        );
+        
+        if (!response.ok) {
+            const errorText = await response.text();
+            if (response.status === 401) {
+                throw new Error('Invalid Deepgram API key. Please check your configuration.');
+            } else if (response.status === 400) {
+                console.warn('Deepgram rejected audio chunk (possibly incomplete):', errorText);
+                return null; // Don't throw, just skip this chunk
+            }
+            throw new Error(`Deepgram API error: ${response.status} - ${errorText}`);
+        }
+        
+        const result = await response.json();
+        
+        // Extract transcript from Deepgram response
+        if (result.results && result.results.channels && result.results.channels.length > 0) {
+            const channel = result.results.channels[0];
+            if (channel.alternatives && channel.alternatives.length > 0) {
+                const transcript = channel.alternatives[0].transcript;
+                if (transcript && transcript.trim()) {
+                    return transcript.trim();
+                }
+            }
+        }
+        
+        return null;
+    } catch (error) {
+        console.error('Transcription error:', error);
+        throw error;
+    }
+}
+
+// Add transcription to textarea
+function addTranscription(transcript) {
+    const currentText = notesInput.value;
+    const cursorPos = notesInput.selectionStart;
+    
+    // Add space before if there's existing text and it doesn't end with space/newline
+    const prefix = currentText && !currentText.match(/[\s\n]$/) ? ' ' : '';
+    
+    // Insert transcript at cursor position or append to end
+    const newText = currentText.substring(0, cursorPos) + prefix + transcript + currentText.substring(cursorPos);
+    notesInput.value = newText;
+    
+    // Move cursor to end of inserted text
+    const newCursorPos = cursorPos + prefix.length + transcript.length;
+    notesInput.selectionStart = notesInput.selectionEnd = newCursorPos;
+    
+    // Trigger input event
+    notesInput.dispatchEvent(new Event('input'));
+}
+
+// Start recording
+async function startRecording() {
+    try {
+        // Request microphone access
+        audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        
+        // Select best audio format
+        selectedFormat = selectBestAudioFormat();
+        if (!selectedFormat) {
+            throw new Error('No supported audio format found');
+        }
+        
+        console.log('Using audio format:', selectedFormat);
+        
+        // Create MediaRecorder
+        mediaRecorder = new MediaRecorder(audioStream, {
+            mimeType: selectedFormat,
+            audioBitsPerSecond: 128000
+        });
+        
+        segmentChunks = [];
+        
+        // Handle data available
+        mediaRecorder.ondataavailable = (event) => {
+            if (event.data && event.data.size > 0) {
+                segmentChunks.push(event.data);
+            }
+        };
+        
+        // Handle recording stop
+        mediaRecorder.onstop = async () => {
+            if (segmentChunks.length > 0) {
+                const audioBlob = new Blob(segmentChunks, { 
+                    type: selectedFormat || 'audio/webm' 
+                });
+                
+                // Only send if large enough (reduced threshold for live transcription)
+                if (audioBlob.size > 8000) {
+                    try {
+                        const transcription = await transcribeWithDeepgram(audioBlob);
+                        if (transcription && transcription.trim()) {
+                            addTranscription(transcription);
+                        }
+                    } catch (error) {
+                        console.error('Transcription error:', error);
+                        // Don't show error to user for individual chunk failures
+                    }
+                }
+                
+                segmentChunks = []; // Clear for next segment
+                
+                // Restart if still recording (reduced delay for live transcription)
+                if (isRecording && mediaRecorder && mediaRecorder.state === 'inactive') {
+                    setTimeout(() => {
+                        if (isRecording && mediaRecorder) {
+                            mediaRecorder.start();
+                            // Stop after 2 seconds for live transcription
+                            setTimeout(() => {
+                                if (mediaRecorder && mediaRecorder.state === 'recording') {
+                                    mediaRecorder.stop();
+                                }
+                            }, 2000);
+                        }
+                    }, 200); // Reduced delay between segments
+                }
+            }
+        };
+        
+        // Start first segment (use 2 seconds for live transcription)
+        mediaRecorder.start();
+        setTimeout(() => {
+            if (mediaRecorder && mediaRecorder.state === 'recording') {
+                mediaRecorder.stop();
+            }
+        }, 2000); // Reduced to 2 seconds for live transcription
+        
+        isRecording = true;
+        recordBtn.classList.add('recording');
+        
+    } catch (error) {
+        console.error('Error starting recording:', error);
+        showError(`Failed to start recording: ${error.message}`);
+        isRecording = false;
+        recordBtn.classList.remove('recording');
+    }
+}
+
+// Stop recording
+function stopRecording() {
+    isRecording = false;
+    recordBtn.classList.remove('recording');
+    
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        mediaRecorder.stop();
+    }
+    
+    if (audioStream) {
+        audioStream.getTracks().forEach(track => track.stop());
+        audioStream = null;
+    }
+    
+    mediaRecorder = null;
+    segmentChunks = [];
+}
+
+// Record button handler
+recordBtn.addEventListener('click', () => {
+    if (isRecording) {
+        stopRecording();
+    } else {
+        startRecording();
+    }
 });
 
 // Loading messages to cycle through
