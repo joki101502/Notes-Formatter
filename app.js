@@ -8,6 +8,243 @@ const errorMessage = document.getElementById('errorMessage');
 const loadingOverlay = document.getElementById('loadingOverlay');
 const loadingMessage = document.getElementById('loadingMessage');
 
+// Support for bullet points and indentation in textarea
+notesInput.addEventListener('keydown', (e) => {
+    // Handle Tab key for indentation
+    if (e.key === 'Tab') {
+        e.preventDefault();
+        const start = notesInput.selectionStart;
+        const end = notesInput.selectionEnd;
+        const value = notesInput.value;
+        
+        if (e.shiftKey) {
+            // Shift+Tab: Unindent
+            const linesBefore = value.substring(0, start).split('\n');
+            const currentLineIndex = linesBefore.length - 1;
+            const currentLine = linesBefore[currentLineIndex];
+            
+            if (currentLine.startsWith('  ') || currentLine.startsWith('\t')) {
+                const newValue = value.substring(0, start - (currentLine.startsWith('  ') ? 2 : 1)) + 
+                               value.substring(start);
+                notesInput.value = newValue;
+                notesInput.selectionStart = notesInput.selectionEnd = start - (currentLine.startsWith('  ') ? 2 : 1);
+            }
+        } else {
+            // Tab: Indent
+            const linesBefore = value.substring(0, start).split('\n');
+            const linesAfter = value.substring(end).split('\n');
+            const currentLineIndex = linesBefore.length - 1;
+            
+            // If there's a selection spanning multiple lines, indent all selected lines
+            if (start !== end) {
+                const selectedText = value.substring(start, end);
+                const lines = selectedText.split('\n');
+                const indentedLines = lines.map(line => '  ' + line);
+                const newValue = value.substring(0, start) + indentedLines.join('\n') + value.substring(end);
+                notesInput.value = newValue;
+                notesInput.selectionStart = start;
+                notesInput.selectionEnd = start + indentedLines.join('\n').length;
+            } else {
+                // Just indent current line
+                const newValue = value.substring(0, start) + '  ' + value.substring(start);
+                notesInput.value = newValue;
+                notesInput.selectionStart = notesInput.selectionEnd = start + 2;
+            }
+        }
+    }
+    
+    // Handle Enter key to continue bullet points
+    if (e.key === 'Enter') {
+        const start = notesInput.selectionStart;
+        const value = notesInput.value;
+        const linesBefore = value.substring(0, start).split('\n');
+        const currentLine = linesBefore[linesBefore.length - 1];
+        
+        // Check if current line starts with a bullet point
+        const bulletPattern = /^(\s*)([-•*]\s|[-•*]|\d+\.\s)/;
+        const match = currentLine.match(bulletPattern);
+        
+        if (match) {
+            e.preventDefault();
+            const indent = match[1]; // Preserve indentation
+            const bullet = match[2]; // Get the bullet character
+            
+            // Determine next bullet (for numbered lists, increment)
+            let nextBullet = bullet;
+            const numberedMatch = bullet.match(/^(\d+)\.\s?/);
+            if (numberedMatch) {
+                const num = parseInt(numberedMatch[1]);
+                nextBullet = (num + 1) + '. ';
+            } else {
+                // Keep the same bullet character (•, -, or *)
+                nextBullet = bullet.trim() + ' ';
+            }
+            
+            const newValue = value.substring(0, start) + '\n' + indent + nextBullet + value.substring(start);
+            notesInput.value = newValue;
+            const newPos = start + 1 + indent.length + nextBullet.length;
+            notesInput.selectionStart = notesInput.selectionEnd = newPos;
+        }
+    }
+});
+
+// Convert HTML to plain text with bullet points
+function convertHtmlToPlainText(html) {
+    // Create a temporary div to parse HTML
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = html;
+    
+    // Function to count nesting level (how many ul/ol parents)
+    function getNestingLevel(node) {
+        let level = 0;
+        let parent = node.parentElement;
+        while (parent) {
+            if (parent.tagName?.toLowerCase() === 'ul' || parent.tagName?.toLowerCase() === 'ol') {
+                level++;
+            }
+            parent = parent.parentElement;
+        }
+        return level;
+    }
+    
+    // Function to process a node and convert to plain text
+    function processNode(node, indent = '') {
+        let result = '';
+        
+        if (node.nodeType === Node.TEXT_NODE) {
+            // Text node - preserve whitespace
+            const text = node.textContent || '';
+            return text;
+        }
+        
+        if (node.nodeType === Node.ELEMENT_NODE) {
+            const tagName = node.tagName?.toLowerCase();
+            
+            if (tagName === 'ul' || tagName === 'ol') {
+                // List container - process children (don't add extra indent here)
+                const children = Array.from(node.childNodes);
+                children.forEach((child) => {
+                    result += processNode(child, indent);
+                });
+            } else if (tagName === 'li') {
+                // List item - add bullet point with proper indentation
+                const nestingLevel = getNestingLevel(node);
+                const indentSpaces = '  '.repeat(nestingLevel - 1); // -1 because root level is 0 indent
+                
+                // Determine bullet type
+                const isOrdered = node.parentElement?.tagName?.toLowerCase() === 'ol';
+                let bullet = '• ';
+                if (isOrdered) {
+                    // Count previous li siblings at same level to get number
+                    const parentList = node.parentElement;
+                    const siblings = Array.from(parentList.children);
+                    const index = siblings.indexOf(node);
+                    bullet = (index + 1) + '. ';
+                }
+                
+                // Process children to get text content
+                const children = Array.from(node.childNodes);
+                let itemText = '';
+                let hasNestedList = false;
+                
+                children.forEach(child => {
+                    if (child.nodeType === Node.ELEMENT_NODE) {
+                        const childTag = child.tagName?.toLowerCase();
+                        if (childTag === 'ul' || childTag === 'ol') {
+                            hasNestedList = true;
+                            // Process nested list with increased indent
+                            itemText += processNode(child, indentSpaces + '  ');
+                        } else {
+                            // Other elements (p, span, etc.)
+                            itemText += processNode(child, '');
+                        }
+                    } else {
+                        itemText += processNode(child, '');
+                    }
+                });
+                
+                // Clean up the item text
+                itemText = itemText.trim();
+                
+                if (itemText || hasNestedList) {
+                    // If there's a nested list, don't add the bullet on the same line
+                    if (hasNestedList) {
+                        // Add the main item text if it exists
+                        if (itemText && !itemText.includes('•') && !itemText.match(/^\d+\./)) {
+                            result += indentSpaces + bullet + itemText.split('\n')[0] + '\n';
+                        }
+                        // The nested list will be added by processNode
+                        result += itemText;
+                    } else {
+                        result += indentSpaces + bullet + itemText + '\n';
+                    }
+                }
+            } else if (tagName === 'p' || tagName === 'div') {
+                // Paragraph or div - process children and add newline
+                const children = Array.from(node.childNodes);
+                let paraText = '';
+                children.forEach(child => {
+                    paraText += processNode(child, indent);
+                });
+                paraText = paraText.trim();
+                if (paraText) {
+                    result += indent + paraText + '\n';
+                }
+            } else if (tagName === 'br') {
+                // Line break
+                result += '\n';
+            } else {
+                // Other elements - process children
+                const children = Array.from(node.childNodes);
+                children.forEach(child => {
+                    result += processNode(child, indent);
+                });
+            }
+        }
+        
+        return result;
+    }
+    
+    // Process all nodes
+    let text = '';
+    const children = Array.from(tempDiv.childNodes);
+    children.forEach(child => {
+        text += processNode(child);
+    });
+    
+    // Clean up extra newlines but preserve structure
+    return text.replace(/\n{3,}/g, '\n\n').trim();
+}
+
+// Handle paste to preserve formatting and convert HTML bullets
+notesInput.addEventListener('paste', (e) => {
+    e.preventDefault();
+    
+    const clipboardData = e.clipboardData || window.clipboardData;
+    let paste = clipboardData.getData('text/plain');
+    const htmlPaste = clipboardData.getData('text/html');
+    
+    // If HTML is available and contains lists, convert it
+    if (htmlPaste && (htmlPaste.includes('<ul') || htmlPaste.includes('<ol') || htmlPaste.includes('<li'))) {
+        paste = convertHtmlToPlainText(htmlPaste);
+    }
+    
+    // Preserve the text (white-space: pre-wrap will handle formatting)
+    const start = notesInput.selectionStart;
+    const end = notesInput.selectionEnd;
+    const value = notesInput.value;
+    
+    const newValue = value.substring(0, start) + paste + value.substring(end);
+    notesInput.value = newValue;
+    
+    // Set cursor position after pasted text
+    const newPos = start + paste.length;
+    notesInput.selectionStart = notesInput.selectionEnd = newPos;
+    
+    // Trigger input event for any listeners
+    notesInput.dispatchEvent(new Event('input'));
+});
+
 // Loading messages to cycle through
 const loadingMessages = [
     'Reading Notes...',
