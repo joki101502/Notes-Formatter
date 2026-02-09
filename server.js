@@ -11,13 +11,19 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Scout API configuration
-const SCOUT_API_KEY = "secret_QY3-4AjTY4NbE4nUvjpfmodvemovpPIsB_1yp_aQFH0";
-const SCOUT_WORKFLOW_ID = "wf_cml8835ry000m0fs6zvob1hec";
+const SCOUT_API_KEY = process.env.SCOUT_API_KEY || "secret_QY3-4AjTY4NbE4nUvjpfmodvemovpPIsB_1yp_aQFH0";
+const SCOUT_WORKFLOW_ID = process.env.SCOUT_WORKFLOW_ID || "wf_cml8835ry000m0fs6zvob1hec";
+
+// Deepgram API configuration
+const DEEPGRAM_API_KEY = process.env.DEEPGRAM_API_KEY || "102d06d33365001135022be079b39cda7eb79450";
 
 // Middleware
 app.use(cors());
-app.use(express.json({ limit: '10mb' })); // Increase body size limit
 app.use(express.static(__dirname));
+// JSON parser for /api/format endpoint
+app.use('/api/format', express.json({ limit: '10mb' }));
+// Raw body parser for /api/transcribe endpoint (binary audio data)
+app.use('/api/transcribe', express.raw({ type: '*/*', limit: '10mb' }));
 
 // Initialize Scout client
 const client = new ScoutClient({ apiKey: SCOUT_API_KEY });
@@ -145,6 +151,60 @@ app.post('/api/format', async (req, res) => {
         res.status(500).json({ 
             error: 'Failed to format notes',
             message: error.message
+        });
+    }
+});
+
+// API endpoint to transcribe audio with Deepgram (proxy to hide API key)
+app.post('/api/transcribe', async (req, res) => {
+    try {
+        // Get audio data from request body (binary)
+        const audioBuffer = Buffer.isBuffer(req.body) ? req.body : Buffer.from(req.body);
+        
+        if (!audioBuffer || audioBuffer.length === 0) {
+            return res.status(400).json({ 
+                error: 'Missing or empty audio data in request body' 
+            });
+        }
+
+        // Call Deepgram API
+        const response = await fetch(
+            'https://api.deepgram.com/v1/listen?model=nova-2&language=en-US&punctuate=true',
+            {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Token ${DEEPGRAM_API_KEY}`
+                },
+                body: audioBuffer
+            }
+        );
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            if (response.status === 401) {
+                return res.status(500).json({ 
+                    error: 'Invalid Deepgram API key. Please check your configuration.' 
+                });
+            } else if (response.status === 400) {
+                console.warn('Deepgram rejected audio chunk:', errorText);
+                return res.status(400).json({ 
+                    error: 'Invalid audio data',
+                    message: errorText 
+                });
+            }
+            return res.status(response.status).json({ 
+                error: `Deepgram API error: ${response.status}`,
+                message: errorText 
+            });
+        }
+
+        const result = await response.json();
+        res.json(result);
+    } catch (error) {
+        console.error('Error transcribing audio:', error);
+        res.status(500).json({ 
+            error: 'Failed to transcribe audio',
+            message: error.message 
         });
     }
 });

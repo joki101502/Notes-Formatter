@@ -17,12 +17,24 @@ A simple web application that allows users to paste notes and format them using 
 npm install
 ```
 
-2. Start the server:
+2. Create a `.env` file in the root directory with your API keys:
+```bash
+cp .env.example .env
+```
+
+Then edit `.env` and add your API keys:
+```
+SCOUT_API_KEY=your_scout_api_key_here
+SCOUT_WORKFLOW_ID=your_scout_workflow_id_here
+DEEPGRAM_API_KEY=your_deepgram_api_key_here
+```
+
+3. Start the server:
 ```bash
 npm start
 ```
 
-3. Open your browser and navigate to:
+4. Open your browser and navigate to:
 ```
 http://localhost:3000
 ```
@@ -37,9 +49,11 @@ http://localhost:3000
 
 ## API Configuration
 
-The app uses the Scout API with:
-- Workflow ID: `wf_cml8835ry000m0fs6zvob1hec`
-- API Key: Configured in `server.js`
+The app uses the following APIs:
+- **Scout API**: For formatting notes (configured via `SCOUT_API_KEY` and `SCOUT_WORKFLOW_ID` environment variables)
+- **Deepgram API**: For speech-to-text transcription (configured via `DEEPGRAM_API_KEY` environment variable)
+
+All API keys are stored in environment variables (`.env` file) and never exposed to the frontend. Deepgram calls are proxied through the backend for security.
 
 ## Project Structure
 

@@ -1,6 +1,4 @@
-// Deepgram API Configuration
-const DEEPGRAM_API_KEY = '102d06d33365001135022be079b39cda7eb79450';
-const DEEPGRAM_API_URL = 'https://api.deepgram.com/v1/listen';
+// Deepgram API is now proxied through the backend to keep API key secure
 
 // DOM elements
 const notesInput = document.getElementById('notesInput');
@@ -282,7 +280,7 @@ function selectBestAudioFormat() {
     return null; // Fallback to browser default
 }
 
-// Transcribe audio with Deepgram
+// Transcribe audio with Deepgram (via backend proxy)
 async function transcribeWithDeepgram(audioBlob) {
     // Check blob size - too small might be invalid
     if (audioBlob.size < 100) {
@@ -291,27 +289,22 @@ async function transcribeWithDeepgram(audioBlob) {
     }
     
     try {
-        const response = await fetch(
-            `${DEEPGRAM_API_URL}?model=nova-2&language=en-US&punctuate=true`,
-            {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Token ${DEEPGRAM_API_KEY}`
-                    // DO NOT set Content-Type - let Deepgram auto-detect
-                },
-                body: audioBlob
-            }
-        );
+        // Send audio blob directly as binary to backend
+        const response = await fetch('/api/transcribe', {
+            method: 'POST',
+            body: audioBlob
+            // Don't set Content-Type - let browser set it automatically
+        });
         
         if (!response.ok) {
-            const errorText = await response.text();
-            if (response.status === 401) {
-                throw new Error('Invalid Deepgram API key. Please check your configuration.');
+            const error = await response.json();
+            if (response.status === 401 || response.status === 500) {
+                throw new Error(error.message || 'Invalid Deepgram API key. Please check your configuration.');
             } else if (response.status === 400) {
-                console.warn('Deepgram rejected audio chunk (possibly incomplete):', errorText);
+                console.warn('Deepgram rejected audio chunk (possibly incomplete):', error.message);
                 return null; // Don't throw, just skip this chunk
             }
-            throw new Error(`Deepgram API error: ${response.status} - ${errorText}`);
+            throw new Error(error.message || `Transcription error: ${response.status}`);
         }
         
         const result = await response.json();
