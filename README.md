@@ -26,6 +26,7 @@ Then edit `.env` and add your API keys:
 ```
 SCOUT_API_KEY=your_scout_api_key_here
 SCOUT_WORKFLOW_ID=your_scout_workflow_id_here
+EMAIL_WORKFLOW_ID=your_email_workflow_id_here
 DEEPGRAM_API_KEY=your_deepgram_api_key_here
 ```
 
@@ -51,6 +52,7 @@ http://localhost:3000
 
 The app uses the following APIs:
 - **Scout API**: For formatting notes (configured via `SCOUT_API_KEY` and `SCOUT_WORKFLOW_ID` environment variables)
+- **Scout Email API**: For generating follow-up emails (configured via `EMAIL_WORKFLOW_ID` environment variable)
 - **Deepgram API**: For speech-to-text transcription (configured via `DEEPGRAM_API_KEY` environment variable)
 
 All API keys are stored in environment variables (`.env` file) and never exposed to the frontend. Deepgram calls are proxied through the backend for security.

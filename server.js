@@ -13,6 +13,7 @@ const PORT = process.env.PORT || 3000;
 // Scout API configuration
 const SCOUT_API_KEY = process.env.SCOUT_API_KEY || "secret_QY3-4AjTY4NbE4nUvjpfmodvemovpPIsB_1yp_aQFH0";
 const SCOUT_WORKFLOW_ID = process.env.SCOUT_WORKFLOW_ID || "wf_cml8835ry000m0fs6zvob1hec";
+const EMAIL_WORKFLOW_ID = process.env.EMAIL_WORKFLOW_ID || "wf_cmlgrl0wt00150hs6lko26teq";
 
 // Deepgram API configuration
 const DEEPGRAM_API_KEY = process.env.DEEPGRAM_API_KEY || "102d06d33365001135022be079b39cda7eb79450";
@@ -20,8 +21,9 @@ const DEEPGRAM_API_KEY = process.env.DEEPGRAM_API_KEY || "102d06d33365001135022b
 // Middleware
 app.use(cors());
 app.use(express.static(__dirname));
-// JSON parser for /api/format endpoint
+// JSON parser for API endpoints
 app.use('/api/format', express.json({ limit: '10mb' }));
+app.use('/api/generate-email', express.json({ limit: '10mb' }));
 // Raw body parser for /api/transcribe endpoint (binary audio data)
 app.use('/api/transcribe', express.raw({ type: '*/*', limit: '10mb' }));
 
@@ -151,6 +153,98 @@ app.post('/api/format', async (req, res) => {
         res.status(500).json({ 
             error: 'Failed to format notes',
             message: error.message
+        });
+    }
+});
+
+// API endpoint to generate follow-up email
+app.post('/api/generate-email', async (req, res) => {
+    try {
+        const { meeting_notes, recipient } = req.body;
+        
+        console.log('Received request to generate email for recipient:', recipient);
+        
+        if (!meeting_notes) {
+            return res.status(400).json({ 
+                error: 'Missing meeting_notes in request body' 
+            });
+        }
+        
+        if (!recipient || !recipient.trim()) {
+            return res.status(400).json({ 
+                error: 'Missing or empty recipient in request body' 
+            });
+        }
+
+        console.log('Calling Scout email workflow...');
+        const startTime = Date.now();
+        const response = await client.workflows.run(EMAIL_WORKFLOW_ID, {
+            inputs: {
+                formatted_notes: meeting_notes,
+                recipient: recipient.trim()
+            }
+        });
+        const elapsedTime = ((Date.now() - startTime) / 1000).toFixed(2);
+        console.log(`Scout email workflow completed in ${elapsedTime} seconds`);
+
+        const state = response?.run?.state;
+        if (!state) {
+            console.warn('No state found in Scout email response');
+            return res.status(500).json({
+                error: 'Invalid response structure from Scout API',
+                message: 'Response missing state'
+            });
+        }
+
+        let emailData = null;
+
+        // Try to extract email from various possible locations
+        if (state?.llm?.output) {
+            let output = state.llm.output;
+            if (typeof output === 'string') {
+                // Strip markdown code blocks if present
+                output = output.replace(/^```json\s*|\s*```$/g, '').trim();
+                try {
+                    emailData = JSON.parse(output);
+                } catch (e) {
+                    console.warn('Failed to parse LLM output as JSON:', e);
+                }
+            } else if (typeof output === 'object') {
+                emailData = output;
+            }
+        } else if (state?.json_output?.output) {
+            const output = state.json_output.output;
+            if (typeof output === 'object') {
+                emailData = output;
+            } else if (typeof output === 'string') {
+                try {
+                    emailData = JSON.parse(output);
+                } catch (e) {
+                    console.warn('Failed to parse json_output as JSON:', e);
+                }
+            }
+        }
+
+        if (!emailData || !emailData.subject || !emailData.body) {
+            const stateKeys = Object.keys(state).filter(key => !key.startsWith('__') && key !== 'inputs');
+            console.warn('Could not extract email data. Available state keys:', stateKeys);
+            return res.status(500).json({
+                error: 'Invalid email format from Scout API',
+                message: 'Response missing subject or body'
+            });
+        }
+
+        res.json({
+            email: {
+                subject: emailData.subject,
+                body: emailData.body
+            }
+        });
+    } catch (error) {
+        console.error('Error generating email:', error);
+        res.status(500).json({ 
+            error: 'Failed to generate email',
+            message: error.message 
         });
     }
 });

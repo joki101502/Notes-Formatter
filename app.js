@@ -18,6 +18,14 @@ const settingsPage = document.getElementById('settingsPage');
 const darkModeToggle = document.getElementById('darkModeToggle');
 const audioInputSelect = document.getElementById('audioInputSelect');
 const refreshDevicesBtn = document.getElementById('refreshDevicesBtn');
+const generateEmailBtn = document.getElementById('generateEmailBtn');
+const emailPage = document.getElementById('emailPage');
+const emailBackBtn = document.getElementById('emailBackBtn');
+const emailRecipient = document.getElementById('emailRecipient');
+const generateEmailSubmitBtn = document.getElementById('generateEmailSubmitBtn');
+const emailResultSection = document.getElementById('emailResultSection');
+const emailResultContent = document.getElementById('emailResultContent');
+const emailErrorMessage = document.getElementById('emailErrorMessage');
 
 // Speech-to-text state
 let isRecording = false;
@@ -848,7 +856,6 @@ formatBtn.addEventListener('click', async () => {
     }
 });
 
-// Copy button handler (for plain text)
 // Display formatted result
 function displayResult(formattedText, isStructured = false) {
     // Clean up the text - remove markdown code blocks if present
@@ -901,6 +908,12 @@ function displayResult(formattedText, isStructured = false) {
     
     // Store plain text globally for copy function
     window.formattedPlainText = cleanText;
+    
+    // Show email generation button if we have structured data
+    const resultActions = document.getElementById('resultActions');
+    if (resultActions) {
+        resultActions.style.display = 'none'; // Hide by default
+    }
     
     resultSection.style.display = 'block';
     resultSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -968,6 +981,12 @@ function renderMeetingSynthesis(data) {
     
     // Store data globally for copy/download functions
     window.synthesisData = data;
+    
+    // Show email generation button for structured data
+    const resultActions = document.getElementById('resultActions');
+    if (resultActions) {
+        resultActions.style.display = 'block';
+    }
 }
 
 // Helper functions
@@ -1224,6 +1243,9 @@ function showMainPage() {
     if (settingsPage) {
         settingsPage.style.display = 'none';
     }
+    if (emailPage) {
+        emailPage.style.display = 'none';
+    }
     if (mainPage) {
         mainPage.style.display = 'block';
         // Force a reflow to ensure the page is visible
@@ -1267,6 +1289,146 @@ if (refreshDevicesBtn) {
         enumerateAudioDevices();
     });
 }
+
+// Email generation functionality
+function showEmailPage() {
+    if (mainPage) mainPage.style.display = 'none';
+    if (emailPage) {
+        emailPage.style.display = 'block';
+        emailPage.offsetHeight; // Force reflow
+    }
+}
+
+function hideEmailError() {
+    if (emailErrorMessage) {
+        emailErrorMessage.style.display = 'none';
+        emailErrorMessage.textContent = '';
+    }
+}
+
+function showEmailError(message) {
+    if (emailErrorMessage) {
+        emailErrorMessage.textContent = message;
+        emailErrorMessage.style.display = 'block';
+    }
+}
+
+// Generate email handler
+if (generateEmailBtn) {
+    generateEmailBtn.addEventListener('click', () => {
+        showEmailPage();
+    });
+}
+
+if (emailBackBtn) {
+    emailBackBtn.addEventListener('click', () => {
+        showMainPage();
+    });
+}
+
+if (generateEmailSubmitBtn) {
+    generateEmailSubmitBtn.addEventListener('click', async () => {
+        const recipient = emailRecipient?.value?.trim();
+        if (!recipient) {
+            showEmailError('Please enter a recipient name');
+            return;
+        }
+
+        // Get the formatted notes data
+        if (!window.synthesisData) {
+            showEmailError('No meeting notes available. Please format your notes first.');
+            return;
+        }
+
+        // Show loading state
+        const btnText = generateEmailSubmitBtn.querySelector('.btn-text');
+        const btnLoader = generateEmailSubmitBtn.querySelector('.btn-loader');
+        if (btnText) btnText.style.display = 'none';
+        if (btnLoader) btnLoader.style.display = 'inline';
+        generateEmailSubmitBtn.disabled = true;
+        hideEmailError();
+        if (emailResultSection) emailResultSection.style.display = 'none';
+
+        try {
+            const response = await fetch('/api/generate-email', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    meeting_notes: window.synthesisData,
+                    recipient: recipient
+                })
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.message || `Server error: ${response.status}`);
+            }
+
+            const result = await response.json();
+            
+            // Display the email result
+            if (result.email && result.email.subject && result.email.body) {
+                const emailHtml = `
+                    <div class="email-display">
+                        <div class="email-field">
+                            <label class="email-field-label">Subject:</label>
+                            <div class="email-field-value">${escapeHtml(result.email.subject)}</div>
+                        </div>
+                        <div class="email-field">
+                            <label class="email-field-label">Body:</label>
+                            <div class="email-field-value email-body">${formatMultiline(escapeHtml(result.email.body))}</div>
+                        </div>
+                        <div class="email-actions-result">
+                            <button class="btn-copy" onclick="copyEmailToClipboard(event)">Copy Email</button>
+                        </div>
+                    </div>
+                `;
+                if (emailResultContent) {
+                    emailResultContent.innerHTML = emailHtml;
+                }
+                if (emailResultSection) {
+                    emailResultSection.style.display = 'block';
+                    emailResultSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                }
+                // Store email data for copy function
+                window.emailData = result.email;
+            } else {
+                throw new Error('Invalid email format received from server');
+            }
+        } catch (error) {
+            console.error('Error generating email:', error);
+            showEmailError(`Failed to generate email: ${error.message}`);
+        } finally {
+            // Reset button state
+            if (btnText) btnText.style.display = 'inline';
+            if (btnLoader) btnLoader.style.display = 'none';
+            generateEmailSubmitBtn.disabled = false;
+        }
+    });
+}
+
+// Copy email to clipboard
+window.copyEmailToClipboard = function(event) {
+    if (!window.emailData) return;
+    
+    const emailText = `Subject: ${window.emailData.subject}\n\n${window.emailData.body}`;
+    
+    navigator.clipboard.writeText(emailText).then(() => {
+        const btn = event?.target;
+        if (btn) {
+            const originalText = btn.textContent;
+            btn.textContent = 'Copied!';
+            setTimeout(() => {
+                btn.textContent = originalText;
+            }, 2000);
+        }
+    }).catch(err => {
+        console.error('Failed to copy:', err);
+        showEmailError('Failed to copy email to clipboard');
+    });
+};
 
 // Initialize settings on page load
 loadSettings();
