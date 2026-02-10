@@ -11,6 +11,12 @@ body {
     padding: 40px 20px;
     color: #1a1a1a;
     line-height: 1.6;
+    margin: 0;
+}
+
+.page {
+    min-height: 100vh;
+    width: 100%;
 }
 
 .container {
@@ -29,6 +35,64 @@ header {
     padding: 48px 40px;
     text-align: center;
     border-bottom: 1px solid #e5e7eb;
+    position: relative;
+}
+
+.header-content {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    max-width: 100%;
+    position: relative;
+}
+
+.header-content > div:first-child {
+    flex: 1;
+    text-align: center;
+}
+
+.settings-btn {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 6px;
+    color: #6b7280;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: absolute;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+}
+
+.settings-btn:hover {
+    background: #f3f4f6;
+    color: #1a1a1a;
+}
+
+.back-btn {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 6px;
+    color: #6b7280;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: absolute;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+}
+
+.back-btn:hover {
+    background: #f3f4f6;
+    color: #1a1a1a;
 }
 
 header h1 {
@@ -575,4 +639,389 @@ main {
     .body-label {
         font-size: 1em;
     }
+}
+
+/* Settings Page */
+.settings-content {
+    padding: 40px;
+    background: white;
+}
+
+.settings-section {
+    margin-bottom: 40px;
+    padding-bottom: 32px;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.settings-section:last-child {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: none;
+}
+
+.settings-section h2 {
+    font-size: 1.25em;
+    font-weight: 600;
+    margin-bottom: 20px;
+    color: #1a1a1a;
+    letter-spacing: -0.01em;
+}
+
+.settings-option {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+}
+
+.settings-option label:not(.toggle-switch) {
+    font-size: 0.9375em;
+    font-weight: 500;
+    color: #374151;
+    min-width: 120px;
+}
+
+.settings-description {
+    font-size: 0.875em;
+    color: #6b7280;
+    margin-top: 4px;
+    width: 100%;
+    margin-left: 0;
+    line-height: 1.5;
+}
+
+/* Toggle Switch */
+.toggle-switch {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+    position: relative;
+}
+
+.toggle-switch input[type="checkbox"] {
+    position: relative;
+    width: 51px;
+    height: 31px;
+    appearance: none;
+    background: #d1d5db;
+    border-radius: 15.5px;
+    outline: none;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    cursor: pointer;
+    margin: 0;
+    padding: 0;
+    border: none;
+}
+
+.toggle-switch input[type="checkbox"]:checked {
+    background: #01a95f;
+}
+
+.toggle-slider {
+    position: absolute;
+    width: 27px;
+    height: 27px;
+    border-radius: 50%;
+    background: white;
+    top: 2px;
+    left: 2px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    pointer-events: none;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.toggle-switch input[type="checkbox"]:checked + .toggle-slider {
+    transform: translateX(20px);
+}
+
+.toggle-label {
+    font-size: 0.9375em;
+    font-weight: 500;
+    color: #374151;
+    user-select: none;
+}
+
+/* Settings Select */
+.settings-select {
+    flex: 1;
+    min-width: 200px;
+    padding: 12px 16px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 0.9375em;
+    background: white;
+    color: #1a1a1a;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+.settings-select:hover {
+    border-color: #9ca3af;
+}
+
+.settings-select:focus {
+    outline: none;
+    border-color: #01a95f;
+    box-shadow: 0 0 0 3px rgba(1, 169, 95, 0.1);
+}
+
+/* Refresh Devices Button */
+.refresh-devices-btn {
+    background: #f3f4f6;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    padding: 12px;
+    cursor: pointer;
+    color: #6b7280;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 44px;
+    height: 44px;
+}
+
+.refresh-devices-btn:hover {
+    background: #e5e7eb;
+    border-color: #9ca3af;
+    color: #1a1a1a;
+}
+
+.refresh-devices-btn:active {
+    background: #d1d5db;
+}
+
+/* Dark Mode - Global Styles */
+body.dark-mode {
+    background: #111827;
+    color: #f9fafb;
+}
+
+body.dark-mode .container {
+    background: #1f2937;
+    border-color: #374151;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+body.dark-mode header {
+    background: #1f2937;
+    border-bottom-color: #374151;
+    color: #f9fafb;
+}
+
+body.dark-mode header h1 {
+    color: #f9fafb;
+}
+
+body.dark-mode header p {
+    color: #9ca3af;
+}
+
+body.dark-mode .settings-btn {
+    color: #9ca3af;
+}
+
+body.dark-mode .settings-btn:hover {
+    background: #374151;
+    color: #f9fafb;
+}
+
+body.dark-mode main {
+    background: #1f2937;
+}
+
+body.dark-mode .notes-input {
+    background: #111827;
+    border-color: #374151;
+    color: #f9fafb;
+}
+
+body.dark-mode .notes-input:focus {
+    border-color: #01a95f;
+    box-shadow: 0 0 0 3px rgba(1, 169, 95, 0.2);
+}
+
+body.dark-mode .notes-input::placeholder {
+    color: #6b7280;
+}
+
+body.dark-mode .format-btn {
+    background: #01a95f;
+    color: white;
+}
+
+body.dark-mode .format-btn:hover:not(:disabled) {
+    background: #01804a;
+}
+
+body.dark-mode .format-btn:active:not(:disabled) {
+    background: #016639;
+}
+
+body.dark-mode .result-section {
+    background: #111827;
+    border-color: #374151;
+}
+
+body.dark-mode .result-header {
+    border-bottom-color: #374151;
+}
+
+body.dark-mode .action-btn {
+    background: #374151;
+    color: #f9fafb;
+    border-color: #4b5563;
+}
+
+body.dark-mode .action-btn:hover {
+    background: #4b5563;
+    border-color: #6b7280;
+}
+
+body.dark-mode .synthesis-content h1,
+body.dark-mode .synthesis-content h2 {
+    color: #f9fafb;
+}
+
+body.dark-mode .synthesis-content .body-label {
+    color: #01a95f;
+}
+
+body.dark-mode .synthesis-content p,
+body.dark-mode .synthesis-content li {
+    color: #d1d5db;
+}
+
+body.dark-mode .error-message {
+    background: #7f1d1d;
+    color: #fecaca;
+    border-color: #991b1b;
+}
+
+body.dark-mode .loading-overlay {
+    background: rgba(17, 24, 39, 0.95);
+}
+
+body.dark-mode .loading-message {
+    color: #f9fafb;
+}
+
+body.dark-mode .spinner {
+    border-color: #374151;
+    border-top-color: #01a95f;
+}
+
+body.dark-mode .input-label {
+    color: #d1d5db;
+}
+
+/* Dark Mode - Main Page Styles */
+body.dark-mode .plain-text-header,
+body.dark-mode .synthesis-header {
+    background: #111827;
+    border-bottom-color: #374151;
+}
+
+body.dark-mode .plain-text-header h2,
+body.dark-mode .synthesis-header h2 {
+    color: #01a95f;
+}
+
+body.dark-mode .plain-text-content {
+    background: #111827;
+    color: #d1d5db;
+}
+
+body.dark-mode .result-content {
+    background: #111827;
+}
+
+body.dark-mode .btn-copy,
+body.dark-mode .btn-download {
+    background: #374151;
+    color: #01a95f;
+    border-color: #01a95f;
+}
+
+body.dark-mode .btn-copy:hover,
+body.dark-mode .btn-download:hover {
+    background: #01a95f;
+    color: white;
+    border-color: #01a95f;
+}
+
+body.dark-mode .text-muted {
+    color: #6b7280;
+}
+
+body.dark-mode .input-label {
+    color: #d1d5db;
+}
+
+/* Dark Mode - Settings Page Styles */
+body.dark-mode .settings-content {
+    background: #1f2937;
+}
+
+body.dark-mode .settings-section {
+    border-bottom-color: #374151;
+}
+
+body.dark-mode .settings-section h2 {
+    color: #f9fafb;
+}
+
+body.dark-mode .settings-option label:not(.toggle-switch) {
+    color: #d1d5db;
+}
+
+body.dark-mode .back-btn {
+    color: #9ca3af;
+}
+
+body.dark-mode .back-btn:hover {
+    background: #374151;
+    color: #f9fafb;
+}
+
+body.dark-mode .settings-description {
+    color: #9ca3af;
+}
+
+body.dark-mode .toggle-label {
+    color: #d1d5db;
+}
+
+body.dark-mode .settings-select {
+    background: #111827;
+    border-color: #374151;
+    color: #f9fafb;
+}
+
+body.dark-mode .settings-select:hover {
+    border-color: #4b5563;
+}
+
+body.dark-mode .settings-select:focus {
+    border-color: #01a95f;
+    box-shadow: 0 0 0 3px rgba(1, 169, 95, 0.2);
+}
+
+body.dark-mode .refresh-devices-btn {
+    background: #374151;
+    border-color: #4b5563;
+    color: #9ca3af;
+}
+
+body.dark-mode .refresh-devices-btn:hover {
+    background: #4b5563;
+    border-color: #6b7280;
+    color: #f9fafb;
+}
+
+body.dark-mode .refresh-devices-btn:active {
+    background: #4b5563;
 }

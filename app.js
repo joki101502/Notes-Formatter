@@ -11,6 +11,13 @@ const loadingMessage = document.getElementById('loadingMessage');
 const recordBtn = document.getElementById('recordBtn');
 const recordTabBtn = document.getElementById('recordTabBtn');
 const recordBothBtn = document.getElementById('recordBothBtn');
+const settingsBtn = document.getElementById('settingsBtn');
+const backBtn = document.getElementById('backBtn');
+const mainPage = document.getElementById('mainPage');
+const settingsPage = document.getElementById('settingsPage');
+const darkModeToggle = document.getElementById('darkModeToggle');
+const audioInputSelect = document.getElementById('audioInputSelect');
+const refreshDevicesBtn = document.getElementById('refreshDevicesBtn');
 
 // Speech-to-text state
 let isRecording = false;
@@ -350,8 +357,15 @@ function addTranscription(transcript) {
 // Start recording from microphone
 async function startRecording() {
     try {
-        // Request microphone access
-        audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        stopAllRecordings(); // Stop any active recording
+        
+        // Use selected audio device if available
+        const constraints = { audio: true };
+        if (selectedAudioDeviceId) {
+            constraints.audio = { deviceId: { exact: selectedAudioDeviceId } };
+        }
+        
+        audioStream = await navigator.mediaDevices.getUserMedia(constraints);
         recordingMode = 'mic';
         await setupRecording();
     } catch (error) {
@@ -390,9 +404,16 @@ async function combineAudioStreams(micStream, tabStream) {
 // Start recording from both microphone and tab audio
 async function startBothRecording() {
     try {
-        // Request both microphone and tab audio
+        stopAllRecordings(); // Stop any active recording
+        
+        // Use selected audio device if available
+        const micConstraints = { audio: true };
+        if (selectedAudioDeviceId) {
+            micConstraints.audio = { deviceId: { exact: selectedAudioDeviceId } };
+        }
+        
         const [mic, tab] = await Promise.all([
-            navigator.mediaDevices.getUserMedia({ audio: true }),
+            navigator.mediaDevices.getUserMedia(micConstraints),
             navigator.mediaDevices.getDisplayMedia({ 
                 video: true, 
                 audio: {
@@ -1129,3 +1150,123 @@ function hideLoadingOverlay() {
         loadingMessageInterval = null;
     }
 }
+
+// Settings functionality
+let selectedAudioDeviceId = null;
+
+// Load settings from localStorage
+function loadSettings() {
+    // Load dark mode
+    const darkMode = localStorage.getItem('darkMode') === 'true';
+    if (darkModeToggle) {
+        darkModeToggle.checked = darkMode;
+        applyDarkMode(darkMode);
+    }
+    
+    // Load audio device
+    selectedAudioDeviceId = localStorage.getItem('audioDeviceId') || '';
+    if (audioInputSelect) {
+        audioInputSelect.value = selectedAudioDeviceId;
+    }
+}
+
+// Apply dark mode
+function applyDarkMode(enabled) {
+    if (enabled) {
+        document.body.classList.add('dark-mode');
+    } else {
+        document.body.classList.remove('dark-mode');
+    }
+}
+
+// Enumerate audio input devices
+async function enumerateAudioDevices() {
+    try {
+        // Request permission first
+        await navigator.mediaDevices.getUserMedia({ audio: true });
+        
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const audioInputs = devices.filter(device => device.kind === 'audioinput');
+        
+        // Clear existing options except "Default"
+        audioInputSelect.innerHTML = '<option value="">Default</option>';
+        
+        // Add audio input devices
+        audioInputs.forEach(device => {
+            const option = document.createElement('option');
+            option.value = device.deviceId;
+            option.textContent = device.label || `Microphone ${audioInputSelect.options.length}`;
+            if (device.deviceId === selectedAudioDeviceId) {
+                option.selected = true;
+            }
+            audioInputSelect.appendChild(option);
+        });
+    } catch (error) {
+        console.error('Error enumerating audio devices:', error);
+        showError('Failed to access audio devices. Please check permissions.');
+    }
+}
+
+// Navigation functions
+function showSettingsPage() {
+    if (mainPage) {
+        mainPage.style.display = 'none';
+    }
+    if (settingsPage) {
+        settingsPage.style.display = 'block';
+        // Force a reflow to ensure the page is visible
+        settingsPage.offsetHeight;
+        enumerateAudioDevices();
+    }
+}
+
+function showMainPage() {
+    if (settingsPage) {
+        settingsPage.style.display = 'none';
+    }
+    if (mainPage) {
+        mainPage.style.display = 'block';
+        // Force a reflow to ensure the page is visible
+        mainPage.offsetHeight;
+    }
+}
+
+// Settings page handlers
+if (settingsBtn) {
+    settingsBtn.addEventListener('click', () => {
+        showSettingsPage();
+    });
+}
+
+if (backBtn) {
+    backBtn.addEventListener('click', () => {
+        showMainPage();
+    });
+}
+
+// Dark mode toggle
+if (darkModeToggle) {
+    darkModeToggle.addEventListener('change', (e) => {
+        const enabled = e.target.checked;
+        localStorage.setItem('darkMode', enabled);
+        applyDarkMode(enabled);
+    });
+}
+
+// Audio input selection
+if (audioInputSelect) {
+    audioInputSelect.addEventListener('change', (e) => {
+        selectedAudioDeviceId = e.target.value;
+        localStorage.setItem('audioDeviceId', selectedAudioDeviceId);
+    });
+}
+
+// Refresh devices button
+if (refreshDevicesBtn) {
+    refreshDevicesBtn.addEventListener('click', () => {
+        enumerateAudioDevices();
+    });
+}
+
+// Initialize settings on page load
+loadSettings();
