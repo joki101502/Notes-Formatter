@@ -736,6 +736,37 @@ function stopBothRecording() {
     segmentChunks = [];
 }
 
+// Stop all recording modes
+function stopAllRecordings() {
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        mediaRecorder.stop();
+    }
+    if (audioStream) {
+        audioStream.getTracks().forEach(track => track.stop());
+        audioStream = null;
+    }
+    if (micStream) {
+        micStream.getTracks().forEach(track => track.stop());
+        micStream = null;
+    }
+    if (tabStream) {
+        tabStream.getTracks().forEach(track => track.stop());
+        tabStream = null;
+    }
+    if (audioContext) {
+        audioContext.close();
+        audioContext = null;
+    }
+    isRecording = false;
+    isRecordingTab = false;
+    isRecordingBoth = false;
+    recordBtn.classList.remove('recording');
+    recordTabBtn.classList.remove('recording');
+    recordBothBtn.classList.remove('recording');
+    mediaRecorder = null;
+    segmentChunks = [];
+}
+
 // Record button handlers
 recordBtn.addEventListener('click', () => {
     // Stop tab recording if active
